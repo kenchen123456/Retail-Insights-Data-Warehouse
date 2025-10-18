@@ -1,0 +1,182 @@
+create database test_db;
+create schema test_db_Schema;
+CREATE TABLE DimDate (
+    DateID INT PRIMARY KEY,
+    Date DATE,
+    DayOfWeek VARCHAR(10),
+    Month VARCHAR(10),
+    Quarter INT,
+    Year INT,
+    IsWeekend BOOLEAN
+);
+CREATE TABLE DimLoyaltyProgram (
+    LoyaltyProgramID INT PRIMARY KEY,
+    ProgramName VARCHAR(100),
+    ProgramTier VARCHAR(50),
+    PointsAccrued INT
+);
+DROP TABLE IF EXISTS DimCustomer;
+CREATE TABLE DimCustomer (
+    CustomerID INT PRIMARY KEY autoincrement start 1 increment 1,
+    FirstName VARCHAR(50),
+    LastName VARCHAR(100),
+    Gender VARCHAR(20),
+    DateOfBirth DATE,
+    Email VARCHAR(100),
+    PhoneNumber VARCHAR(30),
+    Address VARCHAR(255),
+    City VARCHAR(50),
+    State VARCHAR(50),
+    ZipCode VARCHAR(40),
+    Country VARCHAR(150),
+    LoyaltyProgramID INT
+);
+CREATE TABLE DimProduct (
+    ProductID INT PRIMARY KEY autoincrement start 1 increment 1,
+    ProductName VARCHAR(100),
+    Category VARCHAR(50),
+    Brand VARCHAR(50),
+    UnitPrice DECIMAL(10, 2)
+);
+DROP TABLE IF EXISTS DimStore;
+CREATE TABLE DimStore (
+    StoreID INT PRIMARY KEY autoincrement start 1 increment 1,
+    StoreName VARCHAR(100),
+    StoreType VARCHAR(50),
+    StoreOpeningDate DATE,
+    Address VARCHAR(255),
+    City VARCHAR(50),
+    State VARCHAR(50),
+    ZipCode VARCHAR(10),
+    Country VARCHAR(50),
+    Region VARCHAR(100),
+    ManagerName VARCHAR(100)
+);
+DROP TABLE IF EXISTS FactOrders;
+CREATE TABLE FactOrders (
+    OrderID INT PRIMARY KEY autoincrement start 1 increment 1,
+    DateID INT,
+    CustomerID INT,
+    ProductID INT,
+    StoreID INT,
+    QuantityOrdered INT,
+    OrderAmount DECIMAL(10, 2),
+    DiscountAmount DECIMAL(10, 2),
+    ShippingCost DECIMAL(10, 2),
+    TotalAmount DECIMAL(10, 2),
+    FOREIGN KEY (DateID) REFERENCES DimDate(DateID),
+    FOREIGN KEY (CustomerID) REFERENCES DimCustomer(CustomerID),
+    FOREIGN KEY (ProductID) REFERENCES DimProduct(ProductID),
+    FOREIGN KEY (StoreID) REFERENCES DimStore(StoreID)
+);
+CREATE
+OR REPLACE FILE FORMAT CSV_SOURCE_FILE_FORMAT TYPE = 'CSV' SKIP_HEADER = 1 FIELD_OPTIONALLY_ENCLOSED_BY = '"' DATE_FORMAT = 'YYYY-MM-DD';
+CREATE
+or replace STAGE TESTSTAGE;
+select
+    *
+from
+    DimLoyaltyProgram;
+COPY INTO DimLoyaltyProgram
+from
+    @TEST_DB.TEST_DB_SCHEMA.TESTSTAGE/DimLoyaltyInfo/DimLoyaltyInfo.csv FILE_FORMAT = (FORMAT_NAME = 'CSV_SOURCE_FILE_FORMAT');
+COPY INTO DimCustomer(
+        FirstName,
+        LastName,
+        Gender,
+        DateOfBirth,
+        Email,
+        PhoneNumber,
+        Address,
+        City,
+        State,
+        ZipCode,
+        Country,
+        LoyaltyProgramID
+    )
+from
+    @TEST_DB.TEST_DB_SCHEMA.TESTSTAGE/data_cust/data_cust.csv FILE_FORMAT = (FORMAT_NAME = 'CSV_SOURCE_FILE_FORMAT');
+select
+    *
+from
+    DimCustomer;
+COPY INTO DimProduct(ProductName, Category, Brand, UnitPrice)
+from
+    @TEST_DB.TEST_DB_SCHEMA.TESTSTAGE/data_product/data_product.csv FILE_FORMAT = (FORMAT_NAME = 'CSV_SOURCE_FILE_FORMAT');
+select
+    *
+from
+    DimProduct;
+COPY INTO DimDate(
+        DateID,
+        Date,
+        DayOfWeek,
+        Month,
+        Quarter,
+        Year,
+        IsWeekend
+    )
+from
+    @TEST_DB.TEST_DB_SCHEMA.TESTSTAGE/data_date/data_date.csv FILE_FORMAT = (FORMAT_NAME = 'CSV_SOURCE_FILE_FORMAT');
+select
+    *
+from
+    DimDate;
+COPY INTO DimStore(
+        StoreName,
+        StoreType,
+        StoreOpeningDate,
+        Address,
+        City,
+        State,
+        Country,
+        Region,
+        ManagerName
+    )
+from
+    @TEST_DB.TEST_DB_SCHEMA.TESTSTAGE/data_store/data_store.csv FILE_FORMAT = (FORMAT_NAME = 'CSV_SOURCE_FILE_FORMAT');
+select
+    *
+from
+    DimStore;
+COPY INTO FactOrders(
+        DateID,
+        ProductID,
+        StoreID,
+        CustomerID,
+        QuantityOrdered,
+        OrderAmount,
+        DiscountAmount,
+        ShippingCost,
+        TotalAmount
+    )
+from
+    @TEST_DB.TEST_DB_SCHEMA.TESTSTAGE/factorders/factorders.csv FILE_FORMAT = (FORMAT_NAME = 'CSV_SOURCE_FILE_FORMAT');
+select
+    *
+from
+    FactOrders
+limit
+    100;
+COPY INTO FactOrders(
+        DateID,
+        ProductID,
+        StoreID,
+        CustomerID,
+        QuantityOrdered,
+        OrderAmount,
+        DiscountAmount,
+        ShippingCost,
+        TotalAmount
+    )
+from
+    @TEST_DB.TEST_DB_SCHEMA.TESTSTAGE/Landing_Directory/ FILE_FORMAT = (FORMAT_NAME = 'CSV_SOURCE_FILE_FORMAT');
+select
+    *
+from
+    FactOrders
+limit
+    100;
+CREATE
+    OR REPLACE USER Test_PowerBI_User PASSWORD = 'Test_PowerBI_User' LOGIN_NAME = 'PowerBI User' DEFAULT_ROLE = 'ACCOUNTADMIN' DEFAULT_WAREHOUSE = 'COMPUTE_WH' MUST_CHANGE_PASSWORD = TRUE;
+grant role accountadmin to user Test_PowerBI_User;
